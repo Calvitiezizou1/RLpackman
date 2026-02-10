@@ -271,7 +271,7 @@ char deplace_fantome(int t[HAUT][LARG],pack *P, Ghost F1, Ghost* F, char *D, int
                 *D = 'g';
                 actionFantome(t, F, 'g', p);
             }
-            else if(*D == 'd' && Est_Mur(F->x, F->y+1, t) && Est_Mur(F->x, F->y-1, t) && !(Est_Mur(F->x+11, F->y, t))){
+            else if(*D == 'd' && Est_Mur(F->x, F->y+1, t) && Est_Mur(F->x, F->y-1, t) && !(Est_Mur(F->x+1, F->y, t))){
                 *D = 'd';
                 actionFantome(t, F, 'd', p);
             }
@@ -360,4 +360,63 @@ void deplace_fantome_aleatoire(int t[HAUT][LARG], Ghost* F, char *D, int *p) {
 
         F->compteur = 0;
     }
+}
+void deplace_fantome_safe(int t[HAUT][LARG], Ghost* F, char *D, int *p) {
+    F->compteur++;
+    if (F->compteur <= F->vitesse) return; // Respect de la vitesse du fantôme
+
+    char directions[] = {'h', 'b', 'g', 'd'};
+    char opposes[] = {'b', 'h', 'd', 'g'}; // Pour éviter les demi-tours inutiles
+    char possibles[4];
+    int nb_possibles = 0;
+    int index_oppose = -1;
+
+    // 1. Identifier la direction opposée à la direction actuelle (*D)
+    for (int i = 0; i < 4; i++) {
+        if (directions[i] == *D) {
+            index_oppose = i; 
+            break;
+        }
+    }
+
+    // 2. Lister toutes les directions qui ne sont pas des murs
+    for (int i = 0; i < 4; i++) {
+        int nextX = F->x, nextY = F->y;
+        if (directions[i] == 'h') nextY--;
+        else if (directions[i] == 'b') nextY++;
+        else if (directions[i] == 'g') nextX--;
+        else if (directions[i] == 'd') nextX++;
+
+        if (!Est_Mur(nextX, nextY, t)) {
+            // On évite d'ajouter l'opposé tout de suite pour favoriser l'exploration
+            if (index_oppose != -1 && directions[i] == opposes[index_oppose]) {
+                continue; 
+            }
+            possibles[nb_possibles++] = directions[i];
+        }
+    }
+
+    // 3. Choix final de la direction
+    if (nb_possibles > 0) {
+        // On choisit une direction parmi celles qui ne font pas faire demi-tour
+        *D = possibles[rand() % nb_possibles];
+    } else {
+        // Si aucune issue sauf le demi-tour, on cherche la seule direction possible (le mur opposé)
+        for (int i = 0; i < 4; i++) {
+            int nX = F->x, nY = F->y;
+            if (directions[i] == 'h') nY--;
+            else if (directions[i] == 'b') nY++;
+            else if (directions[i] == 'g') nX--;
+            else if (directions[i] == 'd') nX++;
+            
+            if (!Est_Mur(nX, nY, t)) {
+                *D = directions[i];
+                break;
+            }
+        }
+    }
+
+    // 4. Exécuter le mouvement et réinitialiser le compteur
+    actionFantome(t, F, *D, p);
+    F->compteur = 0;
 }

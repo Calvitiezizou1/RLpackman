@@ -25,7 +25,7 @@ typedef struct {
 
 
 int get_state(pack *p ,int t[HAUT][LARG] , Ghost ghost[4]);
-float get_reward(pack *p, int t[HAUT][LARG], Ghost ghost[4], int old_vie, int old_score) ;
+float get_reward(pack *p, int t[HAUT][LARG], Ghost ghost[4], int old_x , int old_y,int old_vie, int old_score, int action_tentee);
 void update_q_table(QAgent *agent ,int s , int a , int s_next , float reward);
 int choix_action(QAgent *agent , int state);
 char int_to_dir(int action) ;

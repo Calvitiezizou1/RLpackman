@@ -42,6 +42,7 @@ const int MAP_INITIALE[HAUT][LARG]= {
 }; 
 
 int get_state(pack *p ,int t[HAUT][LARG] , Ghost ghost[4]){
+
     int state = 0 ;
     int X = p->x ; 
     int Y = p->y ; 
@@ -57,32 +58,40 @@ int get_state(pack *p ,int t[HAUT][LARG] , Ghost ghost[4]){
     int g_proche = 0;
 
     for(int i =0 ; i<4 ; i++){
-        int d = abs(X - ghost[i].x) + abs(Y - ghost[i].y);
-        if (d<dist_g){
+        int d = abs(X - ghost[i].x) + abs(Y - ghost[i].y); // Distance de Manhattan
+        if (d < dist_g){
             dist_g = d;
             g_proche = i ;
         } 
     }
 
-    // poze du fantome : sur 4bit aussi 
-    if(ghost[g_proche].y< Y ){ // au dessus (NORD)
-        state|= (1<<4);
-    }else if (ghost[g_proche].y> Y){// sud
-        state|=(1<<5);
+    // IMPORTANT : On n'encode la position du fantôme QUE s'il est proche (ex: < 5 cases)
+    // Sinon, l'agent a peur de fantômes inoffensifs.
+    if (dist_g < 999) {
+        if(ghost[g_proche].y < Y ) state |= (1<<4); // Nord
+        else if (ghost[g_proche].y > Y) state |= (1<<5); // Sud
+
+        if(ghost[g_proche].x > X) state |= (1<<6); // Droite
+        else if (ghost[g_proche].x < X) state |= (1<<7); // Gauche
     }
 
-    if(ghost[g_proche].x > X){ // il est a droite
-        state|=(1<<6);
-    }else if (ghost[g_proche].x < X){ // a guauche 
-        state |= (1<<7); 
-   }
-
     // Bits 8-11 : CIBLE PRIORITAIRE (Cerise > Big Gum > Gum)
-    int target_x = X, target_y = Y, dist_target = 999;
-    int types[] = {3, 2, 0}; // Priorités
-    int found = 0;
+    int target_x = X, target_y = Y;
 
-    for(int k = 0; k < 3 && !found; k++) {
+    int found = 0;
+    int l ; 
+    int types[7]; 
+    if(p->etat ==  1) {
+        int temp[] = {130, 120, 110, 100, 3, 2, 0};
+        memcpy(types , temp,sizeof(temp));
+        l = 7; 
+    }else {
+        int temp[] = {3, 2, 0}; 
+        memcpy(types , temp,sizeof(temp));
+        l = 3;
+    }
+    for(int k = 0; k < l && !found; k++) {
+        int dist_target = 999 ; 
         for(int i = 0; i < HAUT; i++) {
             for(int j = 0; j < LARG; j++) {
                 if(t[i][j] == types[k]) {
@@ -95,7 +104,9 @@ int get_state(pack *p ,int t[HAUT][LARG] , Ghost ghost[4]){
                 }
             }
         }
+        if(found) break;
     }
+
 
     if(found) {
         if(target_y < Y) state |= (1 << 8);
@@ -103,6 +114,7 @@ int get_state(pack *p ,int t[HAUT][LARG] , Ghost ghost[4]){
         if(target_x < X) state |= (1 << 10);
         if(target_x > X) state |= (1 << 11);
     }
+
 
     return state ; 
 }
@@ -115,24 +127,49 @@ on utilise la fonction de bellman jsp quoi et on introduit les constantes suivan
     ϵ (Epsilon) : Taux d'exploration. Probabilité de choisir une action au hasard.
     Q(s,a)←Q(s,a)+α[r+γ  maxQ(s',a)−Q(s,a)]
 */
+/*
+reward ; 
+mort = -100
+big gum = +20
+gum = +5
+step = -0.5
+immobile = -5
+*/
+float get_reward(pack *p, int t[HAUT][LARG], Ghost ghost[4], int old_x , int old_y,int old_vie, int old_score , int action_tentee) {
+    if (p->vie < old_vie) return -500.0f;  
+    
+    //int diff = p->point - old_score;
+    //if (diff >= 100) return 20.0f;   
+    //if (diff == 10) return 5.0f;     
 
-float get_reward(pack *p, int t[HAUT][LARG], Ghost ghost[4], int old_vie, int old_score) {
-    if (p->vie < old_vie) return -500.0f;
-    int diff = p->point - old_score ; 
-    if (diff >0) {
-
-        if (diff >= 100){
-            return (float)150.0f;
+    int next_x = old_x, next_y = old_y;
+    if (action_tentee == 0) next_y--;      // haut
+    else if (action_tentee == 1) next_y++; // bas
+    else if (action_tentee == 2) next_x--; // gauche
+    else if (action_tentee == 3) next_x++; // droite
+        
+    if (p->x == old_x && p->y == old_y) {
+        if (t[next_y][next_x] == 1) {
+            return -20.0f; 
         }
-        return 20.0f;
+        return -10.0f; 
     }
-    int cell = t[p->y][p->x];
-    if (cell == 3) return 100.0f;  // Cerise
-    if(cell == 4 ) return -2.0f ;
 
-    // 4. PENALITE DE TEMPS : Pour chaque mouvement "vide"
-    return -1.0f;
-}
+    if(t[next_y][next_x] == 5){
+        return -10.0f ;
+    }
+    if(t[next_y][next_x] == 0){
+        return 10.0f;
+    }
+    if(t[next_y][next_x] == 3){
+        return 100.0f;
+    }
+    if(t[next_y][next_x] == 2){
+        return 50.0f;
+    }
+    return -0.1f; 
+    }
+
 
 
 void update_q_table(QAgent *agent ,int s , int a , int s_next , float reward){
@@ -150,22 +187,33 @@ void update_q_table(QAgent *agent ,int s , int a , int s_next , float reward){
 
 int choix_action(QAgent *agent , int state){
     float r = (float)rand() / (float)RAND_MAX;
-    // rand() genere un nombre entier pseudo-aleatoir entre 0 et RAND_MAX
-    if(r<agent->epsilon){
-        return (rand()%NOMBRE_ACTION);
+    if(r < agent->epsilon){
+        return (rand() % NOMBRE_ACTION);
     }
 
-    float best_q = agent->q_table[state][0] ; 
+    float best_q = -100000.0f; 
     int best_a = 0;
-    for(int i= 0; i<NOMBRE_ACTION;i++ ){
-        if(best_q < agent->q_table[state][i]){
-            best_q =agent->q_table[state][i];
-            best_a = i;
+    int ties[NOMBRE_ACTION];
+    int n_ties = 0;
+
+    for(int i = 0; i < NOMBRE_ACTION; i++){
+        if(agent->q_table[state][i] > best_q){
+            best_q = agent->q_table[state][i];
         }
     }
-    return best_a;
-}
+    //notion de tolerance flottante j'ai pas troip compris mais c'est un conseil de gemini
+    for(int i = 0; i < NOMBRE_ACTION; i++){
+        if(agent->q_table[state][i] >= best_q - 0.001f){ // Tolérance flottante
+            ties[n_ties] = i;
+            n_ties++;
+        }
 
+
+    }
+
+
+    return ties[rand() % n_ties];
+}
 
 char int_to_dir(int action) {
     if (action == 0) return 'h';
@@ -197,7 +245,7 @@ void train(QAgent *agent , int epochs){
     char df[4] = {'x' , 'x' , 'x' , 'x'};
     int ps[4] = {0,0,0,0}; 
     int total_score = 0 ;
-    const int MAX_STEP = 2000;
+    const int MAX_STEP = 1000;
     for (int e  = 0 ; e < epochs ; e++){
         reset_env(&p ,ghost ,&score ,&vie, &compt) ; 
         int s = get_state( &p, tab_2D , ghost);
@@ -210,17 +258,19 @@ void train(QAgent *agent , int epochs){
 
             int s_old = score;
             int v_old = vie;
-
+            int old_x= p.x ;
+            int old_y = p.y ; 
             char d = Deplacement_RL(&p,tab_2D,&score,&compt,dir);
             for(int i =0 ; i<4 ; i++ ){
-                deplace_fantome_aleatoire(tab_2D, &ghost[i], &df[i], &ps[i]);
+                
+                deplace_fantome_safe(tab_2D, &ghost[i], &df[i], &ps[i]);                //printf("%d",e);
             }
 
             Death(&p, &ghost[0], &ghost[1], &ghost[2], &ghost[3], &vie , &score);
             UpdateTab(&p, &ghost[0], &ghost[1], &ghost[2], &ghost[3], tab_2D);
             
             int s_next = get_state(&p,tab_2D,ghost);
-            float r = get_reward(&p , tab_2D , ghost, v_old ,s_old); 
+            float r = get_reward(&p , tab_2D , ghost,old_x,old_y, v_old ,s_old ,a); 
 
             update_q_table(agent,s,a,s_next,r); 
             s = s_next;
@@ -243,9 +293,9 @@ void train(QAgent *agent , int epochs){
             
             fflush(stdout); // Force l'affichage immédiat sur le terminal
         }
-        
-        //if (agent->epsilon > 0.05f) agent->epsilon *= 0.999f;
-
+        if (e%10 == 0 ){
+            if (agent->epsilon > 0.05f) agent->epsilon *= 0.999f;
+        }
 
     }
 }

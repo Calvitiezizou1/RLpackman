@@ -85,29 +85,32 @@ char D_Pack = 'd';
 
 int main(int argc, char *argv[]) {
 
-
-    /*      TRAIN 
+/*
 
     srand(time(NULL));
 
-    QAgent agent_pacman;
-    agent_pacman.alpha = 0.1f;
-    agent_pacman.gamma = 0.9f;
-    agent_pacman.epsilon = 0.9f; 
+    QAgent *agent_pacman = malloc(sizeof(QAgent));
+    if (agent_pacman == NULL) {
+        perror("Erreur allocation agent");
+        return 1;
+    }
+    agent_pacman->alpha = 0.1f;
+    agent_pacman->gamma = 0.9f;
+    agent_pacman->epsilon = 0.9f; 
 
-    train(&agent_pacman, 100000); 
+    train(agent_pacman, 100000); 
 
 
-    save_q_table(&agent_pacman, "ia_pacman.dat");
+    save_q_table(agent_pacman, "ia_pacman.dat");
+    free(agent_pacman) ; 
+
 */
     QAgent agent_pacman;
 
     load_q_table(&agent_pacman, "ia_pacman.dat");
 
-// IMPORTANT : On met epsilon à 0 pour que l'IA ne joue QUE ses meilleurs coups
     agent_pacman.epsilon = 0.0f; 
 
-// On regroupe les fantômes dans un tableau pour get_state  
     Ghost ghosts[4];
 
 
@@ -226,7 +229,7 @@ int main(int argc, char *argv[]) {
         ghosts[2] = F_Bleu;  ghosts[3] = F_Jaune;
 
     // 2. L'IA analyse la situation et choisit une action
-        int s = get_state(&PacMan, tab_2D, &ghosts);
+        int s = get_state(&PacMan, tab_2D, ghosts);
         int a = choix_action(&agent_pacman, s);
         char dir_ia = int_to_dir(a);
 
@@ -255,18 +258,6 @@ int main(int argc, char *argv[]) {
     SDL_Delay(10000);
 
 
-    
 
 }
 
-/*
-A FAIRE :
--Faire sortir les fantomes du spawn
--réussir a fixer la barre
-
-
-
-
-
-
-*/

@@ -18,6 +18,7 @@ int Est_Mur(int x, int y, int t[HAUT][LARG]);
 void actionFantome(int t[HAUT][LARG], Ghost* F, char dir, int *p);
 char deplace_fantome(int t[HAUT][LARG], pack *P, Ghost F1, Ghost* F, char *D, int *p);
 void deplace_fantome_aleatoire(int t[HAUT][LARG], Ghost* F, char *D, int *p);
+void deplace_fantome_safe(int t[HAUT][LARG], Ghost* F, char *D, int *p);
 
 typedef struct{
     int dist;
